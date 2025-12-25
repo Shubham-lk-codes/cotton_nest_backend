@@ -1,11 +1,24 @@
-// orderRoutes.js
 const express = require('express');
 const router = express.Router();
-const { getAllOrders, getUserOrders, updateOrderStatus, getOrderById } = require('../controllers/orderController');
+const {
+  getAllOrders,
+  getUserOrders,
+  getOrderById,
+  updateOrderStatus,
+  getOrderStats,
+  getRecentOrders
+} = require('../controllers/orderController');
+const { validateOrderStatusUpdate } = require('../middleware/validation');
+const { adminAuth, optionalAuth } = require('../middleware/auth');
 
-router.get('/all', getAllOrders);
+// Public routes
 router.get('/user/:email', getUserOrders);
-router.put('/update-status/:orderId', updateOrderStatus);
 router.get('/:orderId', getOrderById);
+
+// Admin only routes
+router.get('/all', adminAuth, getAllOrders);
+router.put('/update-status/:orderId', adminAuth, validateOrderStatusUpdate, updateOrderStatus);
+router.get('/stats', adminAuth, getOrderStats);
+router.get('/recent', adminAuth, getRecentOrders);
 
 module.exports = router;
