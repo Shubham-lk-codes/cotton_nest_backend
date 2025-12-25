@@ -1,35 +1,115 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
+const helmet = require('helmet');
+const morgan = require('morgan');
 const connectDB = require('./config/db');
+const errorHandler = require('./middleware/errorHandler');
+const { corsOptions } = require('./middleware/auth');
 
-// Load env vars
-dotenv.config();
+// Import routes
+const paymentRoutes = require('./routes/paymentRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
 
-// Connect to database
-connectDB();
-
+// Initialize Express app
 const app = express();
 
-// Middleware
-app.use(cors({
-  origin: process.env.FRONTEND_URL,
-  credentials: true,
+// Connect to MongoDB
+connectDB();
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"]
+    }
+  }
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// Routes
-app.use('/api/payment', require('./routes/paymentRoutes'));
-app.use('/api/orders', require('./routes/orderRoutes'));
+// CORS configuration
+app.use(cors(corsOptions));
 
-// Health check
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', message: 'Server is running' });
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Logging middleware
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
+}
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path} - ${req.ip}`);
+  next();
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV,
+    version: process.version
+  });
+});
+
+// API routes
+app.use('/api/payment', paymentRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/webhooks', webhookRoutes);
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.originalUrl} not found`
+  });
+});
+
+// Global error handler
+app.use(errorHandler);
+
+// Start server
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  console.log(`📞 Health check: http://localhost:${PORT}/health`);
+  console.log(`💳 Payment API: http://localhost:${PORT}/api/payment`);
+  console.log(`📦 Orders API: http://localhost:${PORT}/api/orders`);
 });
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Rejection:', err);
+  server.close(() => process.exit(1));
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  server.close(() => process.exit(1));
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('Process terminated');
+  });
+});
+
+module.exports = app;
