@@ -35,6 +35,7 @@ const productSchema = new mongoose.Schema({
   // Images
   images: [{
     url: String,
+    public_id: String,
     alt: String,
     isPrimary: {
       type: Boolean,
@@ -62,7 +63,8 @@ const productSchema = new mongoose.Schema({
       type: Number,
       default: 0,
       min: 0
-    }
+    },
+    sku: String
   }],
   
   // Inventory
@@ -171,6 +173,15 @@ productSchema.pre('save', function(next) {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
   }
+  
+  // Ensure arrays are initialized
+  if (!this.colors) this.colors = [];
+  if (!this.sizes) this.sizes = [];
+  if (!this.images) this.images = [];
+  if (!this.careInstructions) this.careInstructions = [];
+  if (!this.features) this.features = [];
+  if (!this.keywords) this.keywords = [];
+  
   next();
 });
 
@@ -180,7 +191,7 @@ productSchema.index({ price: 1 });
 productSchema.index({ ratings: -1 });
 productSchema.index({ createdAt: -1 });
 productSchema.index({ slug: 1 }, { unique: true });
-productSchema.index({ sku: 1 }, { unique: true, sparse: true });
+productSchema.index({ 'sizes.sku': 1 }, { unique: true, sparse: true });
 
 const Product = mongoose.model('Product', productSchema);
 

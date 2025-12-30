@@ -11,6 +11,103 @@ const generateSKU = (name, color, size) => {
   return `${prefix}-${colorCode}-${sizeCode}-${random}`;
 };
 
+// @desc    Get product statistics
+// @route   GET /api/products/stats
+// @access  Public
+exports.getProductStats = async (req, res) => {
+  try {
+    const stats = await Product.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalProducts: { $sum: 1 },
+          totalStock: { $sum: '$stock' },
+          averagePrice: { $avg: '$price' },
+          maxPrice: { $max: '$price' },
+          minPrice: { $min: '$price' },
+          totalCategories: { $addToSet: '$category' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          totalProducts: 1,
+          totalStock: 1,
+          averagePrice: { $round: ['$averagePrice', 2] },
+          maxPrice: 1,
+          minPrice: 1,
+          totalCategories: { $size: '$totalCategories' }
+        }
+      }
+    ]);
+
+    // Get category-wise product counts
+    const categoryStats = await Product.aggregate([
+      {
+        $group: {
+          _id: '$category',
+          count: { $sum: 1 },
+          stock: { $sum: '$stock' }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      }
+    ]);
+
+    // Get stock status counts
+    const stockStats = await Product.aggregate([
+      {
+        $addFields: {
+          stockStatus: {
+            $cond: [
+              { $lte: ['$stock', 0] },
+              'out-of-stock',
+              {
+                $cond: [
+                  { $lte: ['$stock', '$lowStockThreshold'] },
+                  'low-stock',
+                  'in-stock'
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$stockStatus',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    res.json({
+      success: true,
+      stats: stats[0] || {
+        totalProducts: 0,
+        totalStock: 0,
+        averagePrice: 0,
+        maxPrice: 0,
+        minPrice: 0,
+        totalCategories: 0
+      },
+      categories: categoryStats,
+      stockStatus: stockStats,
+      featuredProducts: await Product.countDocuments({ isFeatured: true }),
+      newProducts: await Product.countDocuments({ isNew: true }),
+      activeProducts: await Product.countDocuments({ isActive: true })
+    });
+  } catch (error) {
+    console.error('Error fetching product stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch product statistics',
+      error: error.message
+    });
+  }
+};
+
 // @desc    Create new product
 // @route   POST /api/admin/products
 // @access  Private/Admin
