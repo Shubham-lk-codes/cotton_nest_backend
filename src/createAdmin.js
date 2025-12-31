@@ -1,11 +1,11 @@
-// createAdmin.js
+// createNewAdmin.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
-const User = require('./models/User'); // Adjust path based on your structure
+const User = require('./models/User');
 
-const createAdmin = async () => {
+const createNewAdmin = async () => {
   try {
     // Connect to MongoDB
     await mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://shubhamlonkar137_db_user:RrwsEdAGURyxAff0@cluster0.zfiqvhw.mongodb.net/?appName=Cluster0', {
@@ -15,23 +15,18 @@ const createAdmin = async () => {
 
     console.log('Connected to MongoDB');
 
-    // Check if admin already exists
-    const existingAdmin = await User.findOne({ email: 'admin@example.com' });
-    
-    if (existingAdmin) {
-      console.log('Admin user already exists!');
-      console.log('Email:', existingAdmin.email);
-      console.log('Password: (use the password you set during creation)');
-      process.exit(0);
-    }
+    // Delete existing admin if exists
+    await User.deleteOne({ email: 'admin@example.com' });
+    console.log('Deleted existing admin user if existed');
 
-    // Create new admin
-    const adminData = {
-      name: 'Admin',
+    // Create new admin using User model (so pre-save hook runs)
+    const adminUser = new User({
+      name: 'Super Admin',
       email: 'admin@example.com',
-      password: 'Admin@123', // You should change this password
+      password: 'Admin@123', // This will be hashed by pre-save hook
       role: 'admin',
       isActive: true,
+      isEmailVerified: true,
       permissions: [
         'products:create',
         'products:read',
@@ -42,22 +37,23 @@ const createAdmin = async () => {
         'categories:manage',
         'analytics:view'
       ]
-    };
+    });
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    adminData.password = await bcrypt.hash(adminData.password, salt);
-
-    const admin = new User(adminData);
-    await admin.save();
-
-    console.log('✅ Admin user created successfully!');
+    await adminUser.save();
+    
+    console.log('✅ Admin user created successfully using User model!');
     console.log('==============================');
     console.log('Email: admin@example.com');
     console.log('Password: Admin@123');
     console.log('==============================');
-    console.log('⚠️  IMPORTANT: Change this password immediately after first login!');
-    console.log('To run: node createAdmin.js');
+    
+    // Verify the password was hashed
+    const savedUser = await User.findOne({ email: 'admin@example.com' }).select('+password');
+    console.log('Password stored:', savedUser.password ? `HASHED (${savedUser.password.length} chars)` : 'NOT STORED');
+    
+    // Test password comparison
+    const testPassword = await bcrypt.compare('Admin@123', savedUser.password);
+    console.log('Password test result:', testPassword ? '✅ PASS' : '❌ FAIL');
 
   } catch (error) {
     console.error('Error creating admin:', error);
@@ -67,4 +63,4 @@ const createAdmin = async () => {
   }
 };
 
-createAdmin();
+createNewAdmin();

@@ -79,8 +79,19 @@ userSchema.pre('save', async function(next) {
 });
 
 // Compare password method
+// models/User.js - UPDATED comparePassword method
 userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
+  try {
+    // If password doesn't exist (shouldn't happen with select('+password'))
+    if (!this.password) {
+      return false;
+    }
+    
+    return await bcrypt.compare(candidatePassword, this.password);
+  } catch (error) {
+    console.error('Password comparison error:', error);
+    return false;
+  }
 };
 
 // Generate reset password token
