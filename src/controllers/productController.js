@@ -417,30 +417,30 @@ exports.getAdminProducts = async (req, res) => {
 // @desc    Get product by ID
 // @route   GET /api/admin/products/:id
 // @access  Private/Admin
-exports.getProductById = async (req, res) => {
-  try {
-    const product = await Product.findById(req.params.id);
+// exports.getProductById = async (req, res) => {
+//   try {
+//     const product = await Product.findById(req.params.id);
     
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found'
-      });
-    }
+//     if (!product) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Product not found'
+//       });
+//     }
     
-    res.json({
-      success: true,
-      product
-    });
-  } catch (error) {
-    console.error('Error fetching product:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch product',
-      error: error.message
-    });
-  }
-};
+//     res.json({
+//       success: true,
+//       product
+//     });
+//   } catch (error) {
+//     console.error('Error fetching product:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Failed to fetch product',
+//       error: error.message
+//     });
+//   }
+// };
 
 // @desc    Upload product images
 // @route   POST /api/admin/products/upload-images
@@ -469,6 +469,184 @@ exports.uploadImages = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to upload images',
+      error: error.message
+    });
+  }
+};
+
+// Add these routes before existing routes:
+
+// @desc    Get all products (public)
+// @route   GET /api/products
+// @access  Public
+exports.getProducts = async (req, res) => {
+  try {
+    const { 
+      category, 
+      minPrice, 
+      maxPrice, 
+      color, 
+      size, 
+      search,
+      featured,
+      new: isNew,
+      limit = 50,
+      sort = '-createdAt'
+    } = req.query;
+    
+    let query = { isActive: true };
+    
+    // Category filter
+    if (category && category !== 'all') {
+      // Convert from slug to proper category name
+      const categories = {
+        't-shirts': 'tshirts',
+        'hoodies-sweatshirts': 'hoodies',
+        'pants': 'pants',
+        'accessories': 'accessories'
+      };
+      
+      query.category = categories[category] || category;
+    }
+    
+    // Price filter
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = parseFloat(minPrice);
+      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+    }
+    
+    // Color filter
+    if (color) {
+      const colors = color.split(',');
+      query['colors.name'] = { $in: colors };
+    }
+    
+    // Size filter
+    if (size) {
+      const sizes = size.split(',');
+      query['sizes.size'] = { $in: sizes };
+    }
+    
+    // Search filter
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { category: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Featured filter
+    if (featured === 'true') {
+      query.isFeatured = true;
+    }
+    
+    // New filter
+    if (isNew === 'true') {
+      query.isNew = true;
+    }
+    
+    // Available stock filter
+    query.stock = { $gt: 0 };
+    
+    const products = await Product.find(query)
+      .sort(sort)
+      .limit(parseInt(limit))
+      .select('-__v -updatedAt -metaTitle -metaDescription -keywords');
+    
+    // Transform data for frontend
+    const transformedProducts = products.map(product => ({
+      _id: product._id,
+      id: product._id,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      originalPrice: product.originalPrice,
+      discount: product.discount,
+      category: product.category,
+      images: product.images,
+      colors: product.colors,
+      sizes: product.sizes,
+      material: product.material,
+      careInstructions: product.careInstructions,
+      features: product.features,
+      rating: product.ratings?.average || 4.5,
+      reviews: product.ratings?.count || Math.floor(Math.random() * 100) + 10,
+      stock: product.stock,
+      isFeatured: product.isFeatured,
+      isNew: product.isNew,
+      isActive: product.isActive,
+      createdAt: product.createdAt
+    }));
+    
+    res.json({
+      success: true,
+      count: transformedProducts.length,
+      products: transformedProducts
+    });
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch products',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get single product by ID (public)
+// @route   GET /api/products/:id
+// @access  Public
+exports.getProductById = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id)
+      .select('-__v -metaTitle -metaDescription -keywords');
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    if (!product.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product is not available'
+      });
+    }
+    
+    res.json({
+      success: true,
+      product: {
+        _id: product._id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        discount: product.discount,
+        category: product.category,
+        images: product.images,
+        colors: product.colors,
+        sizes: product.sizes,
+        material: product.material,
+        careInstructions: product.careInstructions,
+        features: product.features,
+        ratings: product.ratings,
+        stock: product.stock,
+        isFeatured: product.isFeatured,
+        isNew: product.isNew,
+        isActive: product.isActive,
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching product:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch product',
       error: error.message
     });
   }

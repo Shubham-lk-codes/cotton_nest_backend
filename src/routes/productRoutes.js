@@ -40,8 +40,13 @@ const handleMulterError = (err, req, res, next) => {
 };
 
 // Public routes
+// router.get('/stats', productController.getProductStats);
+// router.get('/:id', productController.getProductById);
+
+router.get('/', productController.getProducts); // Add this for public access
 router.get('/stats', productController.getProductStats);
 router.get('/:id', productController.getProductById);
+
 
 // Protected admin routes
 router.route('/')
