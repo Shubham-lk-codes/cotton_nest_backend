@@ -44,7 +44,7 @@ app.use(helmet({
 // CORS configuration
 app.use(cors(corsOptions));
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: ['https://cotton-nest-e-commerce.vercel.app/', 'http://localhost:3000'],
   credentials: true
 }));
 
