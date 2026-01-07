@@ -42,11 +42,16 @@ app.use(helmet({
 }));
 
 // CORS configuration
-app.use(cors(corsOptions));
+const cors = require("cors");
+
 app.use(cors({
-  origin: ['https://cotton-nest-e-commerce.vercel.app/', 'http://localhost:3000'],
-  credentials: true
+  origin: [
+    "https://cotton-nest-e-commerce.vercel.app",
+    "http://localhost:3000"
+  ],
+  credentials: true,
 }));
+
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
