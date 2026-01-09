@@ -206,8 +206,11 @@ orderSchema.virtual('orderNumber').get(function() {
 
 // Virtual for item count
 orderSchema.virtual('itemCount').get(function() {
-  return this.items.reduce((sum, item) => sum + item.quantity, 0);
+  return Array.isArray(this.items)
+    ? this.items.reduce((sum, item) => sum + item.quantity, 0)
+    : 0;
 });
+
 
 // Pre-save middleware
 orderSchema.pre('save', function(next) {

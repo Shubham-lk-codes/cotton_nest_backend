@@ -146,9 +146,18 @@ const getUserOrders = async (req, res, next) => {
  * @route   GET /api/orders/:orderId
  * @access  Public
  */
+
+
 const getOrderById = async (req, res, next) => {
   try {
     const { orderId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid order ID format'
+      });
+    }
 
     const order = await Order.findById(orderId)
       .select('-razorpaySignature -adminNotes -metadata -__v');
@@ -160,16 +169,12 @@ const getOrderById = async (req, res, next) => {
       });
     }
 
-    res.status(200).json({
-      success: true,
-      order
-    });
-
+    res.status(200).json({ success: true, order });
   } catch (error) {
-    console.error('Get order by ID error:', error);
     next(error);
   }
 };
+
 
 /**
  * @desc    Update order status (Admin only)

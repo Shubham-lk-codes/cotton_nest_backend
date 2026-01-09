@@ -9,16 +9,24 @@ const {
   getRecentOrders
 } = require('../controllers/orderController');
 const { validateOrderStatusUpdate } = require('../middleware/validation');
-const { adminAuth, optionalAuth } = require('../middleware/auth');
+const { adminAuth } = require('../middleware/auth');
 
-// Public routes
+/* =========================
+   ADMIN ROUTES (FIRST)
+========================= */
+
+router.get('/all',  getAllOrders);
+router.get('/stats', getOrderStats);
+router.get('/recent', getRecentOrders);
+router.put('/update-status/:orderId', validateOrderStatusUpdate, updateOrderStatus);
+
+/* =========================
+   PUBLIC ROUTES (LAST)
+========================= */
+
 router.get('/user/:email', getUserOrders);
-router.get('/:orderId', getOrderById);
 
-// Admin only routes
-router.get('/all', adminAuth, getAllOrders);
-router.put('/update-status/:orderId', adminAuth, validateOrderStatusUpdate, updateOrderStatus);
-router.get('/stats', adminAuth, getOrderStats);
-router.get('/recent', adminAuth, getRecentOrders);
+// 🚨 ALWAYS KEEP THIS LAST
+router.get('/:orderId', getOrderById);
 
 module.exports = router;
