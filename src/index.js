@@ -47,10 +47,14 @@ app.use(helmet({
 app.use(cors({
   origin: [
     "https://thecottonnest.in",
+    "https://www.thecottonnest.in", // ✅ ADD THIS
     "http://localhost:3000"
   ],
   credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
 
 
 // Body parsing middleware
