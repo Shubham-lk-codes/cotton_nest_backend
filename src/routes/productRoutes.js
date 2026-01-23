@@ -67,4 +67,6 @@ router.route('/:id')
   )
   .delete(productController.deleteProduct);
 
+  router.delete('/:id/images', productController.deleteProductImage);
+
 module.exports = router;

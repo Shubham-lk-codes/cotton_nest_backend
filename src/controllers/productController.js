@@ -236,43 +236,53 @@ exports.updateProduct = async (req, res) => {
     }
 
     // Delete old images if new ones are uploaded
-    if (req.files && req.files.length > 0) {
-      // Delete old images from Cloudinary
-      await Promise.all(
-        product.images.map(image => 
-          cloudinary.uploader.destroy(image.public_id)
-        )
-      );
-      
-      // Add new images
-      const newImages = req.files.map((file, index) => ({
-        url: file.path,
-        public_id: file.filename,
-        alt: `${req.body.name || product.name} - Image ${index + 1}`,
-        isPrimary: index === 0
-      }));
-      
-      product.images = newImages;
-    }
+   // ================= IMAGE HANDLING (FIXED) =================
+
+// CASE 1: New images uploaded
+if (req.files && req.files.length > 0) {
+
+  if (product.images && product.images.length > 0) {
+    await Promise.all(
+      product.images.map(img =>
+        cloudinary.uploader.destroy(img.public_id)
+      )
+    );
+  }
+
+  product.images = req.files.map((file, index) => ({
+    url: file.path,
+    public_id: file.filename,
+    alt: `${req.body.name || product.name} - Image ${index + 1}`,
+    isPrimary: index === 0
+  }));
+
+}
+
+// CASE 2: No new images → keep existing images
+else if (req.body.existingImages) {
+  product.images = JSON.parse(req.body.existingImages);
+}
+
 
     // Update other fields
-    Object.keys(req.body).forEach(key => {
-      if (key !== 'images') {
-        if (key === 'colors' || key === 'sizes' || key === 'careInstructions' || key === 'features') {
-          try {
-            product[key] = JSON.parse(req.body[key]);
-          } catch {
-            product[key] = req.body[key];
-          }
-        } else if (key === 'price' || key === 'originalPrice' || key === 'discount') {
-          product[key] = parseFloat(req.body[key]);
-        } else if (key === 'isFeatured' || key === 'isNew' || key === 'isActive') {
-          product[key] = req.body[key] === 'true';
-        } else {
-          product[key] = req.body[key];
-        }
-      }
-    });
+   Object.keys(req.body).forEach(key => {
+
+  if (key === 'existingImages') return; // 🔥 VERY IMPORTANT
+
+  if (key === 'colors' || key === 'sizes' || key === 'careInstructions' || key === 'features') {
+    product[key] = JSON.parse(req.body[key]);
+  } 
+  else if (key === 'price' || key === 'originalPrice' || key === 'discount') {
+    product[key] = parseFloat(req.body[key]);
+  } 
+  else if (key === 'isFeatured' || key === 'isNew' || key === 'isActive') {
+    product[key] = req.body[key] === 'true';
+  } 
+  else {
+    product[key] = req.body[key];
+  }
+});
+
 
     // Update slug if name changed
     if (req.body.name && req.body.name !== product.name) {
@@ -341,6 +351,53 @@ exports.deleteProduct = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to delete product',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Delete product image
+// @route   DELETE /api/products/:id/images
+// @access  Private/Admin
+exports.deleteProductImage = async (req, res) => {
+  try {
+    const { public_id } = req.body;
+    const product = await Product.findById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    // Delete image from Cloudinary
+    if (public_id) {
+      await cloudinary.uploader.destroy(public_id);
+    }
+
+    // Remove image from product
+    product.images = product.images.filter(img => img.public_id !== public_id);
+    
+    // If we deleted the primary image and there are other images, set first one as primary
+    if (product.images.length > 0) {
+      const primaryImageExists = product.images.some(img => img.isPrimary);
+      if (!primaryImageExists) {
+        product.images[0].isPrimary = true;
+      }
+    }
+
+    await product.save();
+    
+    res.json({
+      success: true,
+      message: 'Image deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting product image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete image',
       error: error.message
     });
   }
